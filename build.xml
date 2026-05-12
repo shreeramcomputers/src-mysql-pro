@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SRC MySQL Pro Extension - Ant Build File
+  ==========================================
+  Extension: com.src.mysqlpro.SRCMySQL
+  Builder:   Shree Ram Computers, Daurala
+  Usage:     ant (locally) OR GitHub Actions (online)
+-->
+<project name="SRCMySQLPro" default="build" basedir=".">
+
+    <property name="ext.name"    value="SRCMySQLPro"/>
+    <property name="ext.package" value="com.src.mysqlpro"/>
+    <property name="ext.class"   value="SRCMySQL"/>
+    <property name="ext.version" value="2"/>
+
+    <!-- Directories -->
+    <property name="src.dir"     value="src"/>
+    <property name="libs.dir"    value="libs"/>
+    <property name="out.dir"     value="out"/>
+    <property name="build.dir"   value="build"/>
+
+    <!-- Jars -->
+    <property name="simple.jar"  value="${libs.dir}/simple-android.jar"/>
+    <property name="android.jar" value="${libs.dir}/android.jar"/>
+    <property name="json.jar"    value="${libs.dir}/json.jar"/>
+
+    <!-- ═══ CLEAN ═══════════════════════════════════════════ -->
+    <target name="clean">
+        <delete dir="${build.dir}"/>
+        <delete dir="${out.dir}"/>
+        <echo>🧹 Cleaned build directories</echo>
+    </target>
+
+    <!-- ═══ INIT ════════════════════════════════════════════ -->
+    <target name="init" depends="clean">
+        <mkdir dir="${build.dir}/classes"/>
+        <mkdir dir="${build.dir}/ext/${ext.package}"/>
+        <mkdir dir="${build.dir}/ext/${ext.package}/files"/>
+        <mkdir dir="${out.dir}"/>
+        <echo>📁 Build directories created</echo>
+    </target>
+
+    <!-- ═══ COMPILE ═════════════════════════════════════════ -->
+    <target name="compile" depends="init">
+        <javac
+            srcdir="${src.dir}"
+            destdir="${build.dir}/classes"
+            source="1.8"
+            target="1.8"
+            encoding="UTF-8"
+            includeantruntime="false"
+            debug="false"
+        >
+            <classpath>
+                <pathelement location="${simple.jar}"/>
+                <pathelement location="${android.jar}"/>
+                <pathelement location="${json.jar}"/>
+            </classpath>
+            <compilerarg value="-Xlint:deprecation"/>
+        </javac>
+        <echo>✅ Java compiled successfully</echo>
+    </target>
+
+    <!-- ═══ PACKAGE → AIX ═══════════════════════════════════ -->
+    <target name="package" depends="compile">
+
+        <!-- Step 1: Create extension classes jar -->
+        <jar destfile="${build.dir}/ext/${ext.package}/classes.jar"
+             basedir="${build.dir}/classes"
+             includes="${ext.package}/**"/>
+        <echo>📦 classes.jar created</echo>
+
+        <!-- Step 2: Copy aiwebres (icon, etc.) -->
+        <copy todir="${build.dir}/ext/${ext.package}/files">
+            <fileset dir="aiwebres" erroronmissingdir="false"/>
+        </copy>
+
+        <!-- Step 3: Generate simple_components.json descriptor -->
+        <echoxml file="${build.dir}/ext/${ext.package}/simple_components.json">
+            [{
+                "type": "${ext.package}.${ext.class}",
+                "name": "SRCMySQL",
+                "external": "true",
+                "categoryString": "EXTENSION",
+                "helpString": "SRC MySQL Pro Extension v2.0 - Secure MySQL for Android Apps. Made by Shree Ram Computers, Daurala, Meerut. Better than Deep Host: HMAC Auth, Session Tokens, Pagination.",
+                "showOnPalette": "true",
+                "nonVisible": "true",
+                "iconName": "aiwebres/icon.png",
+                "androidMinSdk": 7,
+                "version": "${ext.version}",
+                "versionName": "2.0.0",
+                "dateBuilt": "${TODAY}",
+                "events": [
+                    {
+                        "name": "OnSuccess",
+                        "description": "Fired when request succeeds.",
+                        "params": [
+                            {"name":"callId","type":"text"},
+                            {"name":"data","type":"text"},
+                            {"name":"rowCount","type":"number"}
+                        ]
+                    },
+                    {
+                        "name": "OnError",
+                        "description": "Fired when request fails.",
+                        "params": [
+                            {"name":"callId","type":"text"},
+                            {"name":"error","type":"text"}
+                        ]
+                    },
+                    {
+                        "name": "OnAuthenticated",
+                        "description": "Fired when authentication succeeds.",
+                        "params": [
+                            {"name":"sessionToken","type":"text"},
+                            {"name":"expiresInSeconds","type":"number"}
+                        ]
+                    }
+                ],
+                "properties": [
+                    {
+                        "name": "ServerUrl",
+                        "editorType": "string",
+                        "defaultValue": ""
+                    },
+                    {
+                        "name": "SecretKey",
+                        "editorType": "string",
+                        "defaultValue": ""
+                    },
+                    {
+                        "name": "DebugMode",
+                        "editorType": "boolean",
+                        "defaultValue": "false"
+                    },
+                    {
+                        "name": "ConnectTimeoutSeconds",
+                        "editorType": "integer",
+                        "defaultValue": "15"
+                    }
+                ]
+            }]
+        </echoxml>
+        <echo>📄 Component descriptor created</echo>
+
+        <!-- Step 4: ZIP everything into .aix -->
+        <zip destfile="${out.dir}/${ext.name}.aix">
+            <fileset dir="${build.dir}/ext"/>
+        </zip>
+
+        <echo>🎉 ============================================</echo>
+        <echo>🎉 Extension built: ${out.dir}/${ext.name}.aix</echo>
+        <echo>🎉 ============================================</echo>
+    </target>
+
+    <!-- ═══ MAIN BUILD TARGET ═══════════════════════════════ -->
+    <target name="build" depends="package">
+        <echo>✅ SRC MySQL Pro Extension build complete!</echo>
+    </target>
+
+</project>
