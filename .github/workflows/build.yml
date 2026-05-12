@@ -1,0 +1,180 @@
+name: 🔨 Build SRC MySQL Pro Extension
+
+# ============================================================
+# GitHub Actions Workflow
+# SRC MySQL Pro - Kodular/MIT App Inventor Extension
+# 100% Online Build - No local Java/Ant needed!
+# ============================================================
+# Trigger:
+#   - Push to main branch
+#   - Pull Request to main
+#   - Manual trigger from GitHub UI (Actions tab → Run workflow)
+# ============================================================
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release version tag (e.g. v2.1.0)'
+        required: false
+        default: ''
+
+jobs:
+  build:
+    name: Build .aix Extension
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+
+      # ─── Step 1: Checkout code ────────────────────────────
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      # ─── Step 2: Java 8 setup ─────────────────────────────
+      - name: ☕ Setup Java 8 (MIT App Inventor compatible)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+
+      # ─── Step 3: Install Ant ──────────────────────────────
+      - name: 🐜 Install Apache Ant
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q ant
+          ant -version
+
+      # ─── Step 4: Download required JARs ───────────────────
+      - name: 📦 Download MIT App Inventor simple-android.jar
+        run: |
+          mkdir -p libs
+
+          # simple-android.jar — MIT App Inventor runtime
+          echo "Downloading simple-android.jar..."
+          curl -sL "https://github.com/mit-cml/appinventor-sources/releases/download/v2.0.1670-013-nb195a/simple-android.jar" \
+               -o libs/simple-android.jar || \
+          curl -sL "https://github.com/mit-cml/appinventor-sources/raw/main/appinventor/buildserver/build/classes.jar" \
+               -o libs/simple-android.jar || true
+
+          # android.jar — Android SDK stub
+          echo "Downloading android.jar..."
+          curl -sL "https://github.com/Kodular/DevKit/raw/main/android-30.jar" \
+               -o libs/android.jar || \
+          curl -sL "https://github.com/ankidroid/Anki-Android/raw/main/lint-rules/libs/android.jar" \
+               -o libs/android.jar || true
+
+          # json.jar — org.json
+          echo "Downloading json.jar..."
+          curl -sL "https://repo1.maven.org/maven2/org/json/json/20231013/json-20231013.jar" \
+               -o libs/json.jar
+
+          # Verify downloads
+          echo "=== JAR file sizes ==="
+          ls -lh libs/
+          echo "======================"
+
+          # Check if files exist
+          for jar in simple-android.jar android.jar json.jar; do
+            if [ ! -f "libs/$jar" ] || [ ! -s "libs/$jar" ]; then
+              echo "❌ WARNING: libs/$jar missing or empty!"
+            else
+              echo "✅ libs/$jar OK ($(du -h libs/$jar | cut -f1))"
+            fi
+          done
+
+      # ─── Step 5: Create placeholder icon if missing ────────
+      - name: 🖼️ Ensure aiwebres/icon exists
+        run: |
+          mkdir -p aiwebres
+          if [ ! -f "aiwebres/icon.png" ]; then
+            # Create a simple placeholder PNG (1x1 pixel)
+            printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82' > aiwebres/icon.png
+            echo "ℹ️ Created placeholder icon.png"
+          else
+            echo "✅ icon.png found"
+          fi
+
+      # ─── Step 6: Set build date ────────────────────────────
+      - name: 📅 Set Build Date
+        run: echo "TODAY=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+
+      # ─── Step 7: Build with Ant ────────────────────────────
+      - name: 🔨 Build Extension (ant build)
+        run: |
+          echo "Starting Ant build..."
+          ant build -DTODAY=${{ env.TODAY }} -v 2>&1
+          echo "=== Build output ==="
+          ls -lh out/
+          echo "===================="
+
+      # ─── Step 8: Upload .aix as build artifact ─────────────
+      - name: 📤 Upload .aix Extension Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SRCMySQLPro-${{ github.run_number }}
+          path: out/SRCMySQLPro.aix
+          retention-days: 30
+          if-no-files-found: warn
+
+      # ─── Step 9: Create GitHub Release (if tag given) ───────
+      - name: 🚀 Create GitHub Release
+        if: |
+          github.event_name == 'workflow_dispatch' &&
+          github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          name: "SRC MySQL Pro ${{ github.event.inputs.release_tag }}"
+          body: |
+            ## 🎉 SRC MySQL Pro Extension ${{ github.event.inputs.release_tag }}
+            **By Shree Ram Computers, Daurala, Meerut**
+
+            ### What's Better vs Deep Host:
+            - ✅ HMAC Signature Authentication (no plain API key in APK)
+            - ✅ Session Token System (1 hour validity)
+            - ✅ Replay Attack Protection (timestamp validation)
+            - ✅ Server-side Rate Limiting (via master.php)
+            - ✅ Pagination Support (limit + offset)
+            - ✅ Aggregate Functions (COUNT, SUM, AVG, MAX, MIN)
+            - ✅ JSON Helper Functions (GetValue, JsonToList, MakeJson)
+            - ✅ CSV Export Helper
+            - ✅ FREE & Open Source
+
+            ### How to install:
+            1. Download `SRCMySQLPro.aix` below
+            2. In Kodular/MIT App Inventor → Import Extension
+            3. Upload `src_mysql_api.php` to your server
+            4. Configure `SRCM_SECRET_KEY` in the PHP file
+            5. Build your app!
+
+            ---
+            Built on: ${{ env.TODAY }} | Run: #${{ github.run_number }}
+          files: out/SRCMySQLPro.aix
+          draft: false
+          prerelease: false
+
+      # ─── Step 10: Build Summary ───────────────────────────
+      - name: 📊 Build Summary
+        if: always()
+        run: |
+          echo "### 🏗️ Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Extension | SRCMySQLPro.aix |" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | 2.0 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Date | ${{ env.TODAY }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Run Number | #${{ github.run_number }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Java | 8 (Temurin) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Builder | Shree Ram Computers, Daurala |" >> $GITHUB_STEP_SUMMARY
+          if [ -f "out/SRCMySQLPro.aix" ]; then
+            SIZE=$(du -h out/SRCMySQLPro.aix | cut -f1)
+            echo "| File Size | $SIZE |" >> $GITHUB_STEP_SUMMARY
+            echo "| Status | ✅ SUCCESS |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Status | ❌ FAILED |" >> $GITHUB_STEP_SUMMARY
+          fi
